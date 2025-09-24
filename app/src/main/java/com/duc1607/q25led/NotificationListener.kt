@@ -6,6 +6,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import kotlin.math.max
 
 /**
  * Service that listens for notifications from apps and controls the LED accordingly
@@ -18,9 +19,12 @@ class NotificationListener : NotificationListenerService() {
     private val activeNotifications = mutableSetOf<String>() // Set of package names with active notifications
     private var wakeLock: PowerManager.WakeLock? = null
 
-    // Blink configuration
-    private val blinkDuration = 200L // LED on duration in ms
-    private val blinkInterval = 2000L // Total interval between blinks in ms
+    // Preference keys and defaults (must match SettingsScreen)
+    private val prefName = "q25_led_prefs"
+    private val keyBlinkDuration = "blink_duration_ms"
+    private val keyBlinkInterval = "blink_interval_ms"
+    private val defaultBlinkDuration = 200 // ms (matches Settings default)
+    private val defaultBlinkInterval = 1000 // ms
 
     override fun onCreate() {
         super.onCreate()
@@ -84,8 +88,24 @@ class NotificationListener : NotificationListenerService() {
      * Get the saved color for an app package name
      */
     private fun getAppColor(packageName: String): String? {
-        val sharedPrefs = getSharedPreferences("q25_led_prefs", Context.MODE_PRIVATE)
+        val sharedPrefs = getSharedPreferences(prefName, Context.MODE_PRIVATE)
         return sharedPrefs.getString(packageName, null)
+    }
+
+    /**
+     * Load blink duration from preferences (ms)
+     */
+    private fun getBlinkDurationMs(): Long {
+        val prefs = getSharedPreferences(prefName, Context.MODE_PRIVATE)
+        return prefs.getInt(keyBlinkDuration, defaultBlinkDuration).toLong()
+    }
+
+    /**
+     * Load blink interval from preferences (ms)
+     */
+    private fun getBlinkIntervalMs(): Long {
+        val prefs = getSharedPreferences(prefName, Context.MODE_PRIVATE)
+        return prefs.getInt(keyBlinkInterval, defaultBlinkInterval).toLong()
     }
 
     /**
@@ -122,19 +142,25 @@ class NotificationListener : NotificationListenerService() {
             override fun run() {
                 if (!isBlinking) return
 
+                // Read current settings each cycle
+                // onMs = how long LED stays ON per blink
+                // offMs = interval between blinks (LED OFF time)
+                val onMs = getBlinkDurationMs().coerceAtLeast(50L)
+                val offMs = getBlinkIntervalMs().coerceAtLeast(50L)
+                val periodMs = onMs + offMs
+
                 // Turn LED on with the color
                 ledControl(currentBlinkColor ?: "OFF")
 
-                // Schedule turning off after the blink duration
+                // Schedule turning off after the ON duration
                 handler.postDelayed({
                     if (isBlinking) {
-                        // Turn LED off
                         ledControl("OFF")
                     }
-                }, blinkDuration)
+                }, onMs)
 
-                // Schedule next blink cycle
-                handler.postDelayed(this, blinkInterval)
+                // Schedule next blink cycle after ON + OFF
+                handler.postDelayed(this, periodMs)
             }
         }
 

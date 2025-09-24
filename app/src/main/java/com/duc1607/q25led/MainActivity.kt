@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -20,20 +21,37 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.duc1607.q25led.ui.theme.Q25LedTheme
+import kotlin.math.roundToInt
 
 // Define the app routes
 sealed class Screen(val route: String) {
     object Home : Screen("home")
+    // Added Settings destination
+    object Settings : Screen("settings")
 }
+
+// Preference keys for blinking settings
+private const val KEY_BLINK_DURATION_MS = "blink_duration_ms"
+private const val KEY_BLINK_INTERVAL_MS = "blink_interval_ms"
+private const val DEFAULT_BLINK_DURATION_MS = 200
+private const val DEFAULT_BLINK_INTERVAL_MS = 1000
 
 /**
  * Function to control the LED based on the provided color name
@@ -147,6 +165,10 @@ private fun loadSavedApps(context: Context): List<AppInfo> {
     val allPrefs = sharedPrefs.all
 
     for ((packageName, ledColor) in allPrefs) {
+        // Skip non-app keys (settings keys) and non-string values
+        if (packageName == KEY_BLINK_DURATION_MS || packageName == KEY_BLINK_INTERVAL_MS) continue
+        if (ledColor !is String) continue
+
         try {
             // Try to get the application info
             val appInfo = pm.getApplicationInfo(packageName, 0)
@@ -158,7 +180,7 @@ private fun loadSavedApps(context: Context): List<AppInfo> {
                     name = name,
                     packageName = packageName,
                     isSystemApp = isSystemApp,
-                    ledColor = ledColor as? String ?: "BLUE"
+                    ledColor = ledColor
                 )
             )
         } catch (e: Exception) {
@@ -203,20 +225,9 @@ fun HomeScreen() {
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "Q25 LED Controller",
-                style = MaterialTheme.typography.headlineMedium,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-
-            // Display selected apps
+            // Removed in-content title; title is now shown in the top app bar
+            // ...existing code...
             if (selectedApps.isNotEmpty()) {
-                Text(
-                    text = "Selected Apps",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-
                 LazyColumn(
                     modifier = Modifier
                         .weight(1f)
@@ -599,8 +610,139 @@ class MainActivity : ComponentActivity() {
         setContent {
             Q25LedTheme {
                 NotificationPermissionHandler {
-                    HomeScreen()
+                    // Use app root with top app bar and navigation
+                    AppRoot()
                 }
+            }
+        }
+    }
+}
+
+// App root with top app bar and navigation
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AppRoot() {
+    val navController: NavHostController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+
+    Scaffold(
+        topBar = {
+            when (currentRoute) {
+                Screen.Settings.route -> {
+                    TopAppBar(
+                        title = { Text("Settings") },
+                        navigationIcon = {
+                            IconButton(onClick = { navController.navigateUp() }) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Back"
+                                )
+                            }
+                        }
+                    )
+                }
+                else -> {
+                    TopAppBar(
+                        title = { Text("Q25 LED Controller") },
+                        actions = {
+                            IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
+                                Icon(imageVector = Icons.Filled.Settings, contentDescription = "Settings")
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    ) { innerPadding ->
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Home.route,
+            modifier = Modifier.padding(innerPadding)
+        ) {
+            composable(Screen.Home.route) { HomeScreen() }
+            composable(Screen.Settings.route) {
+                SettingsScreen(
+                    onApplied = { navController.navigateUp() }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(onApplied: () -> Unit) {
+    val context = LocalContext.current
+
+    // Slider state (persist across recompositions/config changes)
+    var durationMs by rememberSaveable { mutableStateOf(DEFAULT_BLINK_DURATION_MS.toFloat()) }
+    var intervalMs by rememberSaveable { mutableStateOf(DEFAULT_BLINK_INTERVAL_MS.toFloat()) }
+
+    // Load current prefs on first composition
+    LaunchedEffect(Unit) {
+        val prefs = context.getSharedPreferences("q25_led_prefs", Context.MODE_PRIVATE)
+        durationMs = prefs.getInt(KEY_BLINK_DURATION_MS, DEFAULT_BLINK_DURATION_MS).toFloat()
+        intervalMs = prefs.getInt(KEY_BLINK_INTERVAL_MS, DEFAULT_BLINK_INTERVAL_MS).toFloat()
+    }
+
+    // Helpers to snap values to 50ms steps within [100, 5000]
+    fun snap(value: Float): Float = (((value.coerceIn(100f, 5000f) / 50f).roundToInt()) * 50).toFloat()
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.Top,
+            horizontalAlignment = Alignment.Start
+        ) {
+            Text(
+                text = "Blinking duration: ${durationMs.toInt()} ms",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Slider(
+                value = durationMs,
+                onValueChange = { durationMs = snap(it) },
+                valueRange = 100f..1000f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Blinking interval: ${intervalMs.toInt()} ms",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Slider(
+                value = intervalMs,
+                onValueChange = { intervalMs = snap(it) },
+                valueRange = 100f..5000f,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Push the button to the bottom
+            Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    val prefs = context.getSharedPreferences("q25_led_prefs", Context.MODE_PRIVATE)
+                    prefs.edit()
+                        .putInt(KEY_BLINK_DURATION_MS, durationMs.toInt())
+                        .putInt(KEY_BLINK_INTERVAL_MS, intervalMs.toInt())
+                        .apply()
+
+                    // Show confirmation and go back
+                    Toast.makeText(context, "Settings applied", Toast.LENGTH_SHORT).show()
+                    onApplied()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp)
+            ) {
+                Text("Apply")
             }
         }
     }
@@ -613,24 +755,24 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun NotificationPermissionHandler(content: @Composable () -> Unit) {
     val context = LocalContext.current
-    
+    // Removed misplaced @OptIn annotation
     // Check if we need to request notification permission (Android 13+)
     val needsNotificationPermission = remember {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     }
-    
+
     // State to track whether permission has been granted
     var permissionGranted by remember {
         mutableStateOf(
-            !needsNotificationPermission || 
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == 
+            !needsNotificationPermission ||
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
         )
     }
-    
+
     // State to track if we need to show the permission rationale dialog
     var showRationaleDialog by remember { mutableStateOf(false) }
-    
+
     // Permission launcher
     val permissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
@@ -641,27 +783,27 @@ fun NotificationPermissionHandler(content: @Composable () -> Unit) {
             showRationaleDialog = true
         }
     }
-    
+
     // Check if we need to request notification permission on first composition
     LaunchedEffect(needsNotificationPermission) {
         if (needsNotificationPermission && !permissionGranted) {
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
-    
+
     // Notification listener permission check
     val isNotificationListenerEnabled = remember {
         isNotificationServiceEnabled(context)
     }
-    
+
     var showListenerDialog by remember { mutableStateOf(!isNotificationListenerEnabled) }
-    
+
     // Permission rationale dialog
     if (showRationaleDialog) {
         AlertDialog(
             onDismissRequest = { showRationaleDialog = false },
             title = { Text("Notification Permission") },
-            text = { 
+            text = {
                 Text("To use Q25 LED notifications, the app needs permission to post notifications. " +
                      "Please grant this permission in the app settings.")
             },
