@@ -15,7 +15,7 @@ class NotificationListener : NotificationListenerService() {
     private var isBlinking = false
     private var currentBlinkColor: String? = null
     private var blinkRunnable: Runnable? = null
-    private val activeNotifications = mutableMapOf<String, Int>() // Map of package name to notification count
+    private val activeNotifications = mutableSetOf<String>() // Set of package names with active notifications
     private var wakeLock: PowerManager.WakeLock? = null
 
     // Blink configuration
@@ -45,7 +45,7 @@ class NotificationListener : NotificationListenerService() {
         // If the app is in our list, start blinking the LED with its color
         if (color != null) {
             // Track this notification
-            activeNotifications[packageName] = (activeNotifications[packageName] ?: 0) + 1
+            activeNotifications.add(packageName)
 
             // Start blinking with this color
             startBlinking(color)
@@ -58,25 +58,18 @@ class NotificationListener : NotificationListenerService() {
         val packageName = sbn.packageName
 
         // Check if we're tracking notifications for this package
-        if (activeNotifications.containsKey(packageName)) {
-            // Decrease the notification count for this package
-            val count = activeNotifications[packageName] ?: 0
-            if (count > 1) {
-                // More notifications from this app still exist, just update the count
-                activeNotifications[packageName] = count - 1
-            } else {
-                // This was the last notification from this app, remove it
-                activeNotifications.remove(packageName)
+        if (activeNotifications.contains(packageName)) {
+            // This was the last notification from this app, remove it
+            activeNotifications.remove(packageName)
 
-                // Check if we should stop blinking
-                if (activeNotifications.isEmpty()) {
-                    // No more notifications from any tracked app, stop blinking
-                    stopBlinking()
-                } else {
-                    // We still have notifications from other apps
-                    // Find the next app with notifications and switch to its color
-                    switchToNextNotificationColor()
-                }
+            // Check if we should stop blinking
+            if (activeNotifications.isEmpty()) {
+                // No more notifications from any tracked app, stop blinking
+                stopBlinking()
+            } else {
+                // We still have notifications from other apps
+                // Find the next app with notifications and switch to its color
+                switchToNextNotificationColor()
             }
         }
     }
@@ -100,7 +93,7 @@ class NotificationListener : NotificationListenerService() {
      */
     private fun switchToNextNotificationColor() {
         // Find any app with active notifications
-        val nextApp = activeNotifications.keys.firstOrNull() ?: return
+        val nextApp = activeNotifications.firstOrNull() ?: return
         val nextColor = getAppColor(nextApp) ?: return
 
         // Switch to this color without stopping the current blink cycle
