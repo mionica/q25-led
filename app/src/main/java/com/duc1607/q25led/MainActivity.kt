@@ -52,6 +52,8 @@ private const val KEY_BLINK_DURATION_MS = "blink_duration_ms"
 private const val KEY_BLINK_INTERVAL_MS = "blink_interval_ms"
 private const val DEFAULT_BLINK_DURATION_MS = 200
 private const val DEFAULT_BLINK_INTERVAL_MS = 1000
+// New preference key for ignoring Do Not Disturb
+private const val KEY_IGNORE_DND = "ignore_dnd"
 
 /**
  * Function to control the LED based on the provided color name
@@ -166,7 +168,7 @@ private fun loadSavedApps(context: Context): List<AppInfo> {
 
     for ((packageName, ledColor) in allPrefs) {
         // Skip non-app keys (settings keys) and non-string values
-        if (packageName == KEY_BLINK_DURATION_MS || packageName == KEY_BLINK_INTERVAL_MS) continue
+        if (packageName == KEY_BLINK_DURATION_MS || packageName == KEY_BLINK_INTERVAL_MS || packageName == KEY_IGNORE_DND) continue
         if (ledColor !is String) continue
 
         try {
@@ -677,12 +679,15 @@ fun SettingsScreen(onApplied: () -> Unit) {
     // Slider state (persist across recompositions/config changes)
     var durationMs by rememberSaveable { mutableStateOf(DEFAULT_BLINK_DURATION_MS.toFloat()) }
     var intervalMs by rememberSaveable { mutableStateOf(DEFAULT_BLINK_INTERVAL_MS.toFloat()) }
+    // New toggle state for ignoring Do Not Disturb
+    var ignoreDnd by rememberSaveable { mutableStateOf(false) }
 
     // Load current prefs on first composition
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences("q25_led_prefs", Context.MODE_PRIVATE)
         durationMs = prefs.getInt(KEY_BLINK_DURATION_MS, DEFAULT_BLINK_DURATION_MS).toFloat()
         intervalMs = prefs.getInt(KEY_BLINK_INTERVAL_MS, DEFAULT_BLINK_INTERVAL_MS).toFloat()
+        ignoreDnd = prefs.getBoolean(KEY_IGNORE_DND, false)
     }
 
     // Helpers to snap values to 50ms steps within [100, 5000]
@@ -723,6 +728,30 @@ fun SettingsScreen(onApplied: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             )
 
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Ignore Do Not Disturb toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Ignore Do Not Disturb", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Blink LED even when Do Not Disturb is on",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = ignoreDnd,
+                    onCheckedChange = { ignoreDnd = it }
+                )
+            }
+
             // Push the button to the bottom
             Spacer(modifier = Modifier.weight(1f))
 
@@ -732,6 +761,7 @@ fun SettingsScreen(onApplied: () -> Unit) {
                     prefs.edit()
                         .putInt(KEY_BLINK_DURATION_MS, durationMs.toInt())
                         .putInt(KEY_BLINK_INTERVAL_MS, intervalMs.toInt())
+                        .putBoolean(KEY_IGNORE_DND, ignoreDnd)
                         .apply()
 
                     // Show confirmation and go back

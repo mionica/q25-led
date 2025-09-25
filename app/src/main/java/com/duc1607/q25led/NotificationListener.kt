@@ -1,5 +1,6 @@
 package com.duc1607.q25led
 
+import android.app.NotificationManager
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
@@ -23,6 +24,7 @@ class NotificationListener : NotificationListenerService() {
     private val prefName = "q25_led_prefs"
     private val keyBlinkDuration = "blink_duration_ms"
     private val keyBlinkInterval = "blink_interval_ms"
+    private val keyIgnoreDnd = "ignore_dnd"
     private val defaultBlinkDuration = 200 // ms (matches Settings default)
     private val defaultBlinkInterval = 1000 // ms
 
@@ -109,6 +111,30 @@ class NotificationListener : NotificationListenerService() {
     }
 
     /**
+     * Whether to ignore DND and blink anyway
+     */
+    private fun getIgnoreDnd(): Boolean {
+        val prefs = getSharedPreferences(prefName, Context.MODE_PRIVATE)
+        return prefs.getBoolean(keyIgnoreDnd, false)
+    }
+
+    /**
+     * Detect if system Do Not Disturb is currently active
+     */
+    private fun isDoNotDisturbOn(): Boolean {
+        return try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            when (nm.currentInterruptionFilter) {
+                NotificationManager.INTERRUPTION_FILTER_ALL,
+                NotificationManager.INTERRUPTION_FILTER_UNKNOWN -> false
+                else -> true
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * Switch to the next app's notification color
      */
     private fun switchToNextNotificationColor() {
@@ -147,7 +173,17 @@ class NotificationListener : NotificationListenerService() {
                 // offMs = interval between blinks (LED OFF time)
                 val onMs = getBlinkDurationMs().coerceAtLeast(50L)
                 val offMs = getBlinkIntervalMs().coerceAtLeast(50L)
-                val periodMs = onMs + offMs
+
+                // Respect DND unless user opted to ignore it
+                val shouldIgnoreDnd = getIgnoreDnd()
+                val dndOn = isDoNotDisturbOn()
+                if (dndOn && !shouldIgnoreDnd) {
+                    // Ensure LED is off while in DND
+                    ledControl("OFF")
+                    // Check again after the off interval
+                    handler.postDelayed(this, offMs)
+                    return
+                }
 
                 // Turn LED on with the color
                 ledControl(currentBlinkColor ?: "OFF")
@@ -160,7 +196,7 @@ class NotificationListener : NotificationListenerService() {
                 }, onMs)
 
                 // Schedule next blink cycle after ON + OFF
-                handler.postDelayed(this, periodMs)
+                handler.postDelayed(this, onMs + offMs)
             }
         }
 
