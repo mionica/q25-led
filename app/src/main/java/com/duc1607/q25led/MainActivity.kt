@@ -43,6 +43,7 @@ import kotlin.math.roundToInt
 // Define the app routes
 sealed class Screen(val route: String) {
     object Home : Screen("home")
+
     // Added Settings destination
     object Settings : Screen("settings")
 }
@@ -52,6 +53,7 @@ private const val KEY_BLINK_DURATION_MS = "blink_duration_ms"
 private const val KEY_BLINK_INTERVAL_MS = "blink_interval_ms"
 private const val DEFAULT_BLINK_DURATION_MS = 200
 private const val DEFAULT_BLINK_INTERVAL_MS = 1000
+
 // New preference key for ignoring Do Not Disturb
 private const val KEY_IGNORE_DND = "ignore_dnd"
 
@@ -71,41 +73,49 @@ fun ledControl(colorName: String) {
             green = 0
             blue = 0
         }
+
         "GREEN" -> {
             red = 0
             green = 255
             blue = 0
         }
+
         "BLUE" -> {
             red = 0
             green = 0
             blue = 255
         }
+
         "YELLOW" -> {
             red = 255
             green = 255
             blue = 0
         }
+
         "CYAN" -> {
             red = 0
             green = 255
             blue = 255
         }
+
         "MAGENTA" -> {
             red = 255
             green = 0
             blue = 255
         }
+
         "ORANGE" -> {
             red = 255
             green = 128
             blue = 0
         }
+
         "OFF" -> {
             red = 0
             green = 0
             blue = 0
         }
+
         else -> {
             red = 0
             green = 0
@@ -302,8 +312,9 @@ fun HomeScreen() {
                                     val name = pm.getApplicationLabel(appInfo).toString()
 
                                     // More accurate way to determine if an app is a system app
-                                    val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 &&
-                                            (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0
+                                    val isSystemApp =
+                                        (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0 &&
+                                                (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0
 
                                     val isEnabled = appInfo.enabled
 
@@ -342,8 +353,8 @@ fun HomeScreen() {
                         .filter { !it.isSystemApp || it.packageName.startsWith("com.android.vending") } // Include Play Store
                         .filter {
                             searchQuery.isEmpty() ||
-                            it.name.contains(searchQuery, ignoreCase = true) ||
-                            it.packageName.contains(searchQuery, ignoreCase = true)
+                                    it.name.contains(searchQuery, ignoreCase = true) ||
+                                    it.packageName.contains(searchQuery, ignoreCase = true)
                         }
 
                     // Show count of displayed apps
@@ -401,7 +412,7 @@ fun AppItem(app: AppInfo, onDelete: (String) -> Unit) {
     }
 
     // Get the background color based on the selected LED color
-    val backgroundColor = when(currentColor.uppercase()) {
+    val backgroundColor = when (currentColor.uppercase()) {
         "RED" -> androidx.compose.ui.graphics.Color(0xFFFF5252) // Bright red
         "GREEN" -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // Pure green
         "BLUE" -> androidx.compose.ui.graphics.Color(0xFF2196F3) // Pure blue
@@ -413,7 +424,7 @@ fun AppItem(app: AppInfo, onDelete: (String) -> Unit) {
     }
 
     // Get the content color based on the background for proper contrast
-    val contentColor = when(currentColor.uppercase()) {
+    val contentColor = when (currentColor.uppercase()) {
         "RED", "GREEN", "BLUE", "MAGENTA", "ORANGE" -> androidx.compose.ui.graphics.Color.White
         "YELLOW", "CYAN" -> androidx.compose.ui.graphics.Color.Black
         else -> MaterialTheme.colorScheme.onSurfaceVariant
@@ -526,7 +537,7 @@ fun AppItem(app: AppInfo, onDelete: (String) -> Unit) {
 @Composable
 fun ColorIndicator(color: String) {
     // Background color based on the selected LED color
-    val backgroundColor = when(color.uppercase()) {
+    val backgroundColor = when (color.uppercase()) {
         "RED" -> MaterialTheme.colorScheme.error
         "GREEN" -> androidx.compose.ui.graphics.Color.Green
         "BLUE" -> androidx.compose.ui.graphics.Color.Blue
@@ -644,12 +655,16 @@ fun AppRoot() {
                         }
                     )
                 }
+
                 else -> {
                     TopAppBar(
                         title = { Text("Q25 LED Controller") },
                         actions = {
                             IconButton(onClick = { navController.navigate(Screen.Settings.route) }) {
-                                Icon(imageVector = Icons.Filled.Settings, contentDescription = "Settings")
+                                Icon(
+                                    imageVector = Icons.Filled.Settings,
+                                    contentDescription = "Settings"
+                                )
                             }
                         }
                     )
@@ -691,7 +706,8 @@ fun SettingsScreen(onApplied: () -> Unit) {
     }
 
     // Helpers to snap values to 50ms steps within [100, 5000]
-    fun snap(value: Float): Float = (((value.coerceIn(100f, 5000f) / 50f).roundToInt()) * 50).toFloat()
+    fun snap(value: Float): Float =
+        (((value.coerceIn(100f, 5000f) / 50f).roundToInt()) * 50).toFloat()
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -739,7 +755,10 @@ fun SettingsScreen(onApplied: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Ignore Do Not Disturb", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "Ignore Do Not Disturb",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     Text(
                         text = "Blink LED even when Do Not Disturb is on",
                         style = MaterialTheme.typography.bodySmall,
@@ -749,6 +768,25 @@ fun SettingsScreen(onApplied: () -> Unit) {
                 Switch(
                     checked = ignoreDnd,
                     onCheckedChange = { ignoreDnd = it }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Made with ❤️ by duc1607",
+                    modifier = Modifier
+                        .fillMaxWidth(),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -795,8 +833,8 @@ fun NotificationPermissionHandler(content: @Composable () -> Unit) {
     var permissionGranted by remember {
         mutableStateOf(
             !needsNotificationPermission ||
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
-                PackageManager.PERMISSION_GRANTED
+                    context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
         )
     }
 
@@ -834,8 +872,10 @@ fun NotificationPermissionHandler(content: @Composable () -> Unit) {
             onDismissRequest = { showRationaleDialog = false },
             title = { Text("Notification Permission") },
             text = {
-                Text("To use Q25 LED notifications, the app needs permission to post notifications. " +
-                     "Please grant this permission in the app settings.")
+                Text(
+                    "To use Q25 LED notifications, the app needs permission to post notifications. " +
+                            "Please grant this permission in the app settings."
+                )
             },
             confirmButton = {
                 Button(
@@ -867,8 +907,10 @@ fun NotificationPermissionHandler(content: @Composable () -> Unit) {
             onDismissRequest = { showListenerDialog = false },
             title = { Text("Notification Access") },
             text = {
-                Text("For LED notifications, Q25 LED needs access to your notifications. " +
-                     "Please enable Q25 LED in the Notification Access settings.")
+                Text(
+                    "For LED notifications, Q25 LED needs access to your notifications. " +
+                            "Please enable Q25 LED in the Notification Access settings."
+                )
             },
             confirmButton = {
                 Button(
