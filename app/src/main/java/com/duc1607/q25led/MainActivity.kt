@@ -58,6 +58,19 @@ private const val DEFAULT_BLINK_INTERVAL_MS = 1000
 private const val KEY_IGNORE_DND = "ignore_dnd"
 
 /**
+ * Quickly checks if root (su) access is available by running a trivial command.
+ */
+private fun hasRootAccess(): Boolean {
+    return try {
+        val process = ProcessBuilder("su", "-c", "echo rooted").redirectErrorStream(true).start()
+        val code = process.waitFor()
+        code == 0
+    } catch (_: Exception) {
+        false
+    }
+}
+
+/**
  * Function to control the LED based on the provided color name
  * @param colorName The color to set the LED to, or "OFF" to turn it off
  */
@@ -106,7 +119,7 @@ fun ledControl(colorName: String) {
 
         "ORANGE" -> {
             red = 255
-            green = 128
+            green = 255
             blue = 0
         }
 
@@ -672,16 +685,68 @@ fun AppRoot() {
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding)
+        // Root warning banner shown at the very top of content
+        Column(modifier = Modifier.padding(innerPadding)) {
+            RootAccessBanner()
+
+            // Main navigation content
+            NavHost(
+                navController = navController,
+                startDestination = Screen.Home.route,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                composable(Screen.Home.route) { HomeScreen() }
+                composable(Screen.Settings.route) {
+                    SettingsScreen(
+                        onApplied = { navController.navigateUp() }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * A small warning banner shown at the top if root is not granted.
+ */
+@Composable
+private fun RootAccessBanner() {
+    var rootOk by remember { mutableStateOf(true) }
+    val context = LocalContext.current
+
+    // Initial check
+    LaunchedEffect(Unit) {
+        rootOk = hasRootAccess()
+    }
+
+    if (!rootOk) {
+        Surface(
+            color = MaterialTheme.colorScheme.errorContainer,
+            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier
+                .fillMaxWidth()
         ) {
-            composable(Screen.Home.route) { HomeScreen() }
-            composable(Screen.Settings.route) {
-                SettingsScreen(
-                    onApplied = { navController.navigateUp() }
-                )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Root access not granted",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        text = "LED control requires root. Grant SU permission to Q25 LED.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                TextButton(onClick = { rootOk = hasRootAccess() }) {
+                    Text("Retry")
+                }
             }
         }
     }
