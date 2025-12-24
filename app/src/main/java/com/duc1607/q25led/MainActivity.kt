@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +29,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -166,7 +169,7 @@ data class AppInfo(
 )
 
 // Available LED colors
-val ledColors = listOf("RED", "GREEN", "BLUE", "YELLOW", "CYAN", "MAGENTA", "ORANGE")
+val ledColors = listOf("RED", "GREEN", "BLUE", "YELLOW", "CYAN", "MAGENTA", "ORANGE", "RAINBOW")
 
 // Function to save app and LED color preference
 private fun saveAppPreference(context: Context, packageName: String, ledColor: String) {
@@ -426,22 +429,36 @@ fun AppItem(app: AppInfo, onDelete: (String) -> Unit) {
 
     // Get the background color based on the selected LED color
     val backgroundColor = when (currentColor.uppercase()) {
-        "RED" -> androidx.compose.ui.graphics.Color(0xFFFF5252) // Bright red
-        "GREEN" -> androidx.compose.ui.graphics.Color(0xFF4CAF50) // Pure green
-        "BLUE" -> androidx.compose.ui.graphics.Color(0xFF2196F3) // Pure blue
-        "YELLOW" -> androidx.compose.ui.graphics.Color(0xFFFFEB3B) // Bright yellow
-        "CYAN" -> androidx.compose.ui.graphics.Color(0xFF00BCD4) // Pure cyan
-        "MAGENTA" -> androidx.compose.ui.graphics.Color(0xFFE91E63) // Pink/magenta
-        "ORANGE" -> androidx.compose.ui.graphics.Color(0xFFFF9800) // Pure orange
+        "RED" -> Color(0xFFFF5252) // Bright red
+        "GREEN" -> Color(0xFF4CAF50) // Pure green
+        "BLUE" -> Color(0xFF2196F3) // Pure blue
+        "YELLOW" -> Color(0xFFFFEB3B) // Bright yellow
+        "CYAN" -> Color(0xFF00BCD4) // Pure cyan
+        "MAGENTA" -> Color(0xFFE91E63) // Pink/magenta
+        "ORANGE" -> Color(0xFFFF9800) // Pure orange
+        "RAINBOW" -> Color.Transparent // Transparent for rainbow to show gradient
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
 
     // Get the content color based on the background for proper contrast
     val contentColor = when (currentColor.uppercase()) {
-        "RED", "GREEN", "BLUE", "MAGENTA", "ORANGE" -> androidx.compose.ui.graphics.Color.White
-        "YELLOW", "CYAN" -> androidx.compose.ui.graphics.Color.Black
+        "RED", "GREEN", "BLUE", "MAGENTA", "ORANGE" -> Color.White
+        "YELLOW", "CYAN", "RAINBOW" -> Color.Black
         else -> MaterialTheme.colorScheme.onSurfaceVariant
     }
+
+    val isRainbow = currentColor.uppercase() == "RAINBOW"
+    val rainbowBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFFF5252), // Red
+            Color(0xFFFF9800), // Orange
+            Color(0xFFFFEB3B), // Yellow
+            Color(0xFF4CAF50), // Green
+            Color(0xFF00BCD4), // Cyan
+            Color(0xFF2196F3), // Blue
+            Color(0xFFE91E63)  // Magenta
+        )
+    )
 
     Card(
         modifier = Modifier
@@ -456,38 +473,46 @@ fun AppItem(app: AppInfo, onDelete: (String) -> Unit) {
             defaultElevation = 2.dp
         )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = app.name,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = app.packageName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = contentColor.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                // Delete button
-                IconButton(
-                    onClick = {
-                        // Remove app from preferences
-                        onDelete(app.packageName)
-                    }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(
+                    if (isRainbow) Modifier.background(rainbowBrush) else Modifier
+                )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete",
-                        tint = contentColor
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = app.name,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = app.packageName,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = contentColor.copy(alpha = 0.7f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    // Delete button
+                    IconButton(
+                        onClick = {
+                            // Remove app from preferences
+                            onDelete(app.packageName)
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = contentColor
+                        )
+                    }
                 }
             }
         }
@@ -549,23 +574,46 @@ fun AppItem(app: AppInfo, onDelete: (String) -> Unit) {
 
 @Composable
 fun ColorIndicator(color: String) {
+    val isRainbow = color.uppercase() == "RAINBOW"
+
     // Background color based on the selected LED color
     val backgroundColor = when (color.uppercase()) {
         "RED" -> MaterialTheme.colorScheme.error
-        "GREEN" -> androidx.compose.ui.graphics.Color.Green
-        "BLUE" -> androidx.compose.ui.graphics.Color.Blue
-        "YELLOW" -> androidx.compose.ui.graphics.Color(0xFFFFEB3B)
-        "CYAN" -> androidx.compose.ui.graphics.Color(0xFF00BCD4)
-        "MAGENTA" -> androidx.compose.ui.graphics.Color(0xFFE91E63)
-        "ORANGE" -> androidx.compose.ui.graphics.Color(0xFFFF9800)
+        "GREEN" -> Color.Green
+        "BLUE" -> Color.Blue
+        "YELLOW" -> Color(0xFFFFEB3B)
+        "CYAN" -> Color(0xFF00BCD4)
+        "MAGENTA" -> Color(0xFFE91E63)
+        "ORANGE" -> Color(0xFFFF9800)
+        "RAINBOW" -> Color.Transparent
         else -> MaterialTheme.colorScheme.surfaceVariant
     }
+
+    val rainbowBrush = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFFFF5252), // Red
+            Color(0xFFFF9800), // Orange
+            Color(0xFFFFEB3B), // Yellow
+            Color(0xFF4CAF50), // Green
+            Color(0xFF00BCD4), // Cyan
+            Color(0xFF2196F3), // Blue
+            Color(0xFFE91E63)  // Magenta
+        )
+    )
 
     Surface(
         modifier = Modifier.size(24.dp),
         shape = MaterialTheme.shapes.small,
         color = backgroundColor
-    ) { }
+    ) {
+        if (isRainbow) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(rainbowBrush)
+            )
+        }
+    }
 }
 
 @Composable

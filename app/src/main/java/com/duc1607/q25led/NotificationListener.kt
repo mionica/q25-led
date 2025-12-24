@@ -7,7 +7,6 @@ import android.os.Looper
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import kotlin.math.max
 
 /**
  * Service that listens for notifications from apps and controls the LED accordingly
@@ -27,6 +26,8 @@ class NotificationListener : NotificationListenerService() {
     private val keyIgnoreDnd = "ignore_dnd"
     private val defaultBlinkDuration = 200 // ms (matches Settings default)
     private val defaultBlinkInterval = 1000 // ms
+
+    private val rainbowColors = listOf("RED", "ORANGE", "YELLOW", "GREEN", "CYAN", "BLUE", "MAGENTA")
 
     override fun onCreate() {
         super.onCreate()
@@ -185,18 +186,34 @@ class NotificationListener : NotificationListenerService() {
                     return
                 }
 
-                // Turn LED on with the color
-                ledControl(currentBlinkColor ?: "OFF")
-
-                // Schedule turning off after the ON duration
-                handler.postDelayed({
-                    if (isBlinking) {
-                        ledControl("OFF")
+                if (currentBlinkColor == "RAINBOW") {
+                    // Rainbow cycle
+                    var delay = 0L
+                    for (c in rainbowColors) {
+                        handler.postDelayed({
+                            if (isBlinking && currentBlinkColor == "RAINBOW") {
+                                ledControl(c)
+                            }
+                        }, delay)
+                        delay += onMs
                     }
-                }, onMs)
 
-                // Schedule next blink cycle after ON + OFF
-                handler.postDelayed(this, onMs + offMs)
+                    // Schedule next blink cycle
+                    handler.postDelayed(this, delay + onMs)
+                } else {
+                    // Turn LED on with the color
+                    ledControl(currentBlinkColor ?: "OFF")
+
+                    // Schedule turning off after the ON duration
+                    handler.postDelayed({
+                        if (isBlinking) {
+                            ledControl("OFF")
+                        }
+                    }, onMs)
+
+                    // Schedule next blink cycle after ON + OFF
+                    handler.postDelayed(this, onMs + offMs)
+                }
             }
         }
 
