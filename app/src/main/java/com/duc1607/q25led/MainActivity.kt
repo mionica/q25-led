@@ -69,7 +69,7 @@ private fun hasRootAccess(): Boolean {
         val code = process.waitFor()
         code == 0
     } catch (_: Exception) {
-        false
+        true
     }
 }
 
@@ -142,9 +142,9 @@ fun ledControl(colorName: String) {
     try {
         // Create ProcessBuilder to execute shell commands with su (root) privileges
         val commands = arrayOf(
-            arrayOf("su", "-c", "echo $red > /sys/class/leds/red/brightness"),
-            arrayOf("su", "-c", "echo $green > /sys/class/leds/green/brightness"),
-            arrayOf("su", "-c", "echo $blue > /sys/class/leds/blue/brightness")
+            arrayOf("echo $red > /sys/class/leds/red/brightness"),
+            arrayOf("echo $green > /sys/class/leds/green/brightness"),
+            arrayOf("echo $blue > /sys/class/leds/blue/brightness")
         )
 
         for (command in commands) {

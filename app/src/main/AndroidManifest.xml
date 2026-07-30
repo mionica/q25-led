@@ -6,8 +6,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Add permission to read notifications -->
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+    <permission android:name="com.duc1607.q25led.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+    <uses-permission android:name="com.duc1607.q25led.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
 
-    <!-- Add package visibility queries for Android 11+ -->
     <queries>
         <!-- Query all packages -->
         <intent>
