@@ -16,7 +16,13 @@ class NotificationListener : NotificationListenerService() {
     private var isBlinking = false
     private var currentBlinkColor: String? = null
     private var blinkRunnable: Runnable? = null
-    private val activeNotifications = mutableSetOf<String>() // Set of package names with active notifications
+
+    // Active notifications tracked per package as a set of StatusBarNotification keys.
+    // A package-name-only set cannot distinguish an app's individual notifications, so
+    // removal of any one notification would clear the whole package prematurely. Keying
+    // on sbn.key defers stop until a package's final notification is removed.
+    private val activeByPackage = mutableMapOf<String, MutableSet<String>>()
+
     private var wakeLock: PowerManager.WakeLock? = null
 
     // Preference keys and defaults (must match SettingsScreen)
@@ -47,16 +53,14 @@ class NotificationListener : NotificationListenerService() {
         val packageName = sbn.packageName
 
         // Check if this app is in our saved list and get its color
-        val color = getAppColor(packageName)
+        val color = getAppColor(packageName) ?: return
 
-        // If the app is in our list, start blinking the LED with its color
-        if (color != null) {
-            // Track this notification
-            activeNotifications.add(packageName)
+        // Track this specific notification instance by its key. Repeated posts of the
+        // same key (in-place updates) are de-duplicated by the set.
+        activeByPackage.getOrPut(packageName) { mutableSetOf() }.add(sbn.key)
 
-            // Start blinking with this color
-            startBlinking(color)
-        }
+        // Start blinking with this color
+        startBlinking(color)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
@@ -64,20 +68,21 @@ class NotificationListener : NotificationListenerService() {
 
         val packageName = sbn.packageName
 
-        // Check if we're tracking notifications for this package
-        if (activeNotifications.contains(packageName)) {
-            // This was the last notification from this app, remove it
-            activeNotifications.remove(packageName)
+        // Only act on packages currently tracked.
+        val keys = activeByPackage[packageName] ?: return
 
-            // Check if we should stop blinking
-            if (activeNotifications.isEmpty()) {
-                // No more notifications from any tracked app, stop blinking
-                stopBlinking()
-            } else {
-                // We still have notifications from other apps
-                // Find the next app with notifications and switch to its color
-                switchToNextNotificationColor()
-            }
+        // Remove the specific notification instance; drop the package only when empty.
+        keys.remove(sbn.key)
+        if (keys.isEmpty()) {
+            activeByPackage.remove(packageName)
+        }
+
+        if (activeByPackage.isEmpty()) {
+            // No more notifications from any tracked app, stop blinking
+            stopBlinking()
+        } else {
+            // Notifications from other tracked apps remain; switch to one of their colors
+            switchToNextNotificationColor()
         }
     }
 
@@ -136,11 +141,11 @@ class NotificationListener : NotificationListenerService() {
     }
 
     /**
-     * Switch to the next app's notification color
+     * Switch to a remaining tracked app's notification color
      */
     private fun switchToNextNotificationColor() {
-        // Find any app with active notifications
-        val nextApp = activeNotifications.firstOrNull() ?: return
+        // Select any package that still has active notifications
+        val nextApp = activeByPackage.keys.firstOrNull() ?: return
         val nextColor = getAppColor(nextApp) ?: return
 
         // Switch to this color without stopping the current blink cycle
@@ -202,7 +207,7 @@ class NotificationListener : NotificationListenerService() {
                     handler.postDelayed(this, delay + onMs)
                 } else {
                     // Turn LED on with the color
-                    ledControl(currentBlinkColor ?: "OFF")
+                    ledControl(currentBlinkColor ?: "ON")
 
                     // Schedule turning off after the ON duration
                     handler.postDelayed({

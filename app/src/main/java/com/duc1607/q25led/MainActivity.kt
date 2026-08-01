@@ -64,13 +64,14 @@ private const val KEY_IGNORE_DND = "ignore_dnd"
  * Quickly checks if root (su) access is available by running a trivial command.
  */
 private fun hasRootAccess(): Boolean {
-    return try {
-        val process = ProcessBuilder("su", "-c", "echo rooted").redirectErrorStream(true).start()
-        val code = process.waitFor()
-        code == 0
-    } catch (_: Exception) {
-        true
-    }
+	return true
+//    return try {
+//        val process = ProcessBuilder("su", "-c", "echo rooted").redirectErrorStream(true).start()
+//        val code = process.waitFor()
+//        code == 0
+//    } catch (_: Exception) {
+//        true
+//    }
 }
 
 /**
@@ -78,7 +79,7 @@ private fun hasRootAccess(): Boolean {
  * @param colorName The color to set the LED to, or "OFF" to turn it off
  */
 fun ledControl(colorName: String) {
-    // This function controls the physical LED by writing to the brightness files
+    // Resolves a color name to per-channel brightness, then writes the sysfs LED nodes.
     var red = 0
     var green = 0
     var blue = 0
@@ -121,8 +122,9 @@ fun ledControl(colorName: String) {
         }
 
         "ORANGE" -> {
+            // Green channel reduced to remain distinct from YELLOW.
             red = 255
-            green = 255
+            green = 140
             blue = 0
         }
 
@@ -139,24 +141,23 @@ fun ledControl(colorName: String) {
         }
     }
 
+    // Direct sysfs writes; no shell/su. Node write access is provisioned at the ROM
+    // layer (genfscon labeling plus node ownership), consistent with the smali build.
+    writeLedNode("/sys/class/leds/red/brightness", red)
+    writeLedNode("/sys/class/leds/green/brightness", green)
+    writeLedNode("/sys/class/leds/blue/brightness", blue)
+}
+
+/**
+ * Writes an integer brightness value to a sysfs LED node. Failure (absent node,
+ * permission denied, SELinux denial) is non-fatal so an unavailable channel does not
+ * abort writes to the remaining channels.
+ */
+private fun writeLedNode(path: String, value: Int) {
     try {
-        // Create ProcessBuilder to execute shell commands with su (root) privileges
-        val commands = arrayOf(
-            arrayOf("echo $red > /sys/class/leds/red/brightness"),
-            arrayOf("echo $green > /sys/class/leds/green/brightness"),
-            arrayOf("echo $blue > /sys/class/leds/blue/brightness")
-        )
-
-        for (command in commands) {
-            val process = ProcessBuilder(*command)
-                .redirectErrorStream(true)
-                .start()
-
-            // Wait for the process to complete
-            process.waitFor()
-        }
-    } catch (e: Exception) {
-        // Silent error handling
+        java.io.FileOutputStream(path).use { it.write("$value\n".toByteArray()) }
+    } catch (_: Exception) {
+        // Non-fatal: node unavailable or write not permitted.
     }
 }
 
