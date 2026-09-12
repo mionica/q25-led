@@ -45,6 +45,13 @@ import kotlin.math.roundToInt
 
 // Define the app routes
 sealed class Screen(val route: String) {
+
+    companion object {
+        init {
+            System.loadLibrary("q25led")
+        }
+    }
+
     object Home : Screen("home")
 
     // Added Settings destination
@@ -146,23 +153,11 @@ fun ledControl(colorName: String) {
 
     // Direct sysfs writes; no shell/su. Node write access is provisioned at the ROM
     // layer (genfscon labeling plus node ownership), consistent with the smali build.
-    writeLedNode("/sys/class/leds/red/brightness", red)
-    writeLedNode("/sys/class/leds/green/brightness", green)
-    writeLedNode("/sys/class/leds/blue/brightness", blue)
+    // do this in C++ - Java's ill-suited for sysfs access
+    setLedRGB(red, green, blue)
 }
 
-/**
- * Writes an integer brightness value to a sysfs LED node. Failure (absent node,
- * permission denied, SELinux denial) is non-fatal so an unavailable channel does not
- * abort writes to the remaining channels.
- */
-private fun writeLedNode(path: String, value: Int) {
-    try {
-        java.io.FileOutputStream(path).use { it.write("$value\n".toByteArray()) }
-    } catch (_: Exception) {
-        // Non-fatal: node unavailable or write not permitted.
-    }
-}
+external fun setLedRGB(r: Int, g: Int, b: Int): Unit?
 
 data class AppInfo(
     val name: String,
