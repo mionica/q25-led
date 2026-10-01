@@ -60,6 +60,9 @@ private const val DEFAULT_BLINK_INTERVAL_MS = 1000
 // New preference key for ignoring Do Not Disturb
 private const val KEY_IGNORE_DND = "ignore_dnd"
 
+// Preference key for multi-blink mode (one blink per waiting notification color per cycle)
+private const val KEY_MULTI_BLINK = "multi_blink"
+
 /**
  * Quickly checks if root (su) access is available by running a trivial command.
  */
@@ -195,7 +198,11 @@ private fun loadSavedApps(context: Context): List<AppInfo> {
 
     for ((packageName, ledColor) in allPrefs) {
         // Skip non-app keys (settings keys) and non-string values
-        if (packageName == KEY_BLINK_DURATION_MS || packageName == KEY_BLINK_INTERVAL_MS || packageName == KEY_IGNORE_DND) continue
+        if (packageName == KEY_BLINK_DURATION_MS ||
+            packageName == KEY_BLINK_INTERVAL_MS ||
+            packageName == KEY_IGNORE_DND ||
+            packageName == KEY_MULTI_BLINK
+        ) continue
         if (ledColor !is String) continue
 
         try {
@@ -810,6 +817,8 @@ fun SettingsScreen(onApplied: () -> Unit) {
     var intervalMs by rememberSaveable { mutableStateOf(DEFAULT_BLINK_INTERVAL_MS.toFloat()) }
     // New toggle state for ignoring Do Not Disturb
     var ignoreDnd by rememberSaveable { mutableStateOf(false) }
+    // Toggle state for multi-blink mode
+    var multiBlink by rememberSaveable { mutableStateOf(false) }
 
     // Load current prefs on first composition
     LaunchedEffect(Unit) {
@@ -817,6 +826,7 @@ fun SettingsScreen(onApplied: () -> Unit) {
         durationMs = prefs.getInt(KEY_BLINK_DURATION_MS, DEFAULT_BLINK_DURATION_MS).toFloat()
         intervalMs = prefs.getInt(KEY_BLINK_INTERVAL_MS, DEFAULT_BLINK_INTERVAL_MS).toFloat()
         ignoreDnd = prefs.getBoolean(KEY_IGNORE_DND, false)
+        multiBlink = prefs.getBoolean(KEY_MULTI_BLINK, false)
     }
 
     // Helpers to snap values to 50ms steps within [100, 5000]
@@ -887,6 +897,34 @@ fun SettingsScreen(onApplied: () -> Unit) {
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Multi-blink toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Multi blink",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        text = "Blink once per waiting notification color each cycle. " +
+                            "When off, only the most recent notification blinks",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = multiBlink,
+                    onCheckedChange = { multiBlink = it }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -914,6 +952,7 @@ fun SettingsScreen(onApplied: () -> Unit) {
                         .putInt(KEY_BLINK_DURATION_MS, durationMs.toInt())
                         .putInt(KEY_BLINK_INTERVAL_MS, intervalMs.toInt())
                         .putBoolean(KEY_IGNORE_DND, ignoreDnd)
+                        .putBoolean(KEY_MULTI_BLINK, multiBlink)
                         .apply()
 
                     // Show confirmation and go back
