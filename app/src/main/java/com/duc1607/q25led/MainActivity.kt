@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,12 +46,6 @@ import kotlin.math.roundToInt
 
 // Define the app routes
 sealed class Screen(val route: String) {
-
-    companion object {
-        init {
-            System.loadLibrary("q25led")
-        }
-    }
 
     object Home : Screen("home")
 
@@ -154,10 +149,14 @@ fun ledControl(colorName: String) {
     // Direct sysfs writes; no shell/su. Node write access is provisioned at the ROM
     // layer (genfscon labeling plus node ownership), consistent with the smali build.
     // do this in C++ - Java's ill-suited for sysfs access
-    setLedRGB(red, green, blue)
+    try {
+        setLedRGB(red, green, blue)
+    } catch (e: Exception) {
+        Log.e("q25led", "setLedRGB() failed!")
+    }
 }
 
-external fun setLedRGB(r: Int, g: Int, b: Int): Unit?
+external fun setLedRGB(r: Int, g: Int, b: Int)
 
 data class AppInfo(
     val name: String,

@@ -12,7 +12,7 @@ android {
         applicationId = "com.duc1607.q25led"
         minSdk = 34
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = "1.2-bOS"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -7,11 +7,23 @@ import android.os.Looper
 import android.os.PowerManager
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 
 /**
  * Service that listens for notifications from apps and controls the LED accordingly
  */
 class NotificationListener : NotificationListenerService() {
+
+    companion object {
+        init {
+            try {
+                System.loadLibrary("q25led")
+            } catch (e: Exception) {
+                Log.e("q25led", "System.loadLibrary() failed!")
+            }
+        }
+    }
+
     private val handler = Handler(Looper.getMainLooper())
     private var isBlinking = false
     private var currentBlinkColor: String? = null
